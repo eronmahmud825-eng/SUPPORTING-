@@ -2,228 +2,239 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>LeanLog — Weight Loss Tracker</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Sora:wght@300;400;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Fraunces:ital,wght@0,300;0,700;1,300&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
 
-  <!-- ═══════════════════════════════════════════════════
-       SPLASH SCREEN
-  ═══════════════════════════════════════════════════ -->
-  <div id="splash-screen" class="screen active">
+  <!-- ── SPLASH ── -->
+  <div id="splash" class="screen active">
     <div class="splash-inner">
       <div class="splash-logo">
-        <svg class="logo-icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="24" cy="24" r="22" stroke="white" stroke-width="2.5" fill="none" opacity="0.3"/>
-          <path d="M14 30 C14 30 18 18 24 18 C30 18 34 30 34 30" stroke="white" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-          <circle cx="24" cy="15" r="3" fill="white"/>
-          <path d="M20 34 L24 26 L28 34" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        </svg>
-        <span class="logo-text">LeanLog</span>
+        <span class="logo-leaf">🌿</span>
       </div>
-      <p class="splash-tagline">Your journey, measured.</p>
-      <div class="splash-loader">
-        <div class="splash-loader-bar"></div>
-      </div>
+      <h1 class="splash-title">LeanLog</h1>
+      <p class="splash-sub">Your daily weight & calorie companion</p>
+      <div class="splash-bar"><div class="splash-progress"></div></div>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════
-       ONBOARDING / LOGIN SCREEN
-  ═══════════════════════════════════════════════════ -->
-  <div id="onboarding-screen" class="screen">
-    <div class="onboarding-split">
-      <div class="onboarding-visual">
-        <div class="visual-content">
-          <div class="visual-stat">
-            <span class="vs-num">−12.4</span>
-            <span class="vs-unit">kg lost</span>
+  <!-- ── ONBOARDING ── -->
+  <div id="onboarding" class="screen">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <span class="logo-leaf">🌿</span>
+        <span class="brand-name">LeanLog</span>
+      </div>
+      <h2 class="auth-title">Let's get started</h2>
+      <p class="auth-desc">Enter your details to begin tracking your journey.</p>
+
+      <div class="field-group">
+        <label for="ob-name">Your name</label>
+        <input id="ob-name" type="text" placeholder="e.g. Alex" autocomplete="off"/>
+      </div>
+      <div class="field-row">
+        <div class="field-group">
+          <label for="ob-weight">Starting weight</label>
+          <div class="input-unit">
+            <input id="ob-weight" type="number" step="0.1" placeholder="85.0"/>
+            <span class="unit">kg</span>
           </div>
-          <div class="visual-stat secondary">
-            <span class="vs-num">47</span>
-            <span class="vs-unit">days tracked</span>
-          </div>
-          <div class="visual-bars">
-            <div class="vbar" style="height:60%"></div>
-            <div class="vbar" style="height:75%"></div>
-            <div class="vbar" style="height:65%"></div>
-            <div class="vbar active" style="height:82%"></div>
-            <div class="vbar" style="height:88%"></div>
-            <div class="vbar" style="height:72%"></div>
-            <div class="vbar" style="height:55%"></div>
+        </div>
+        <div class="field-group">
+          <label for="ob-height">Height</label>
+          <div class="input-unit">
+            <input id="ob-height" type="number" placeholder="175"/>
+            <span class="unit">cm</span>
           </div>
         </div>
       </div>
-
-      <div class="onboarding-form-side">
-        <div class="form-header">
-          <div class="mini-logo">
-            <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="var(--accent)" stroke-width="2" fill="none" opacity="0.3"/><path d="M7 15 C7 15 9 9 12 9 C15 9 17 15 17 15" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="12" cy="7" r="1.5" fill="var(--accent)"/></svg>
-          </div>
-          <h1 class="form-title">Get started</h1>
-          <p class="form-subtitle">Tell us a little about you to personalize your experience.</p>
-        </div>
-
-        <div class="form-card">
-          <div class="field-group">
-            <label for="user-name">Your name</label>
-            <input type="text" id="user-name" placeholder="e.g. Sarah" autocomplete="off" />
-          </div>
-
-          <div class="field-row">
-            <div class="field-group">
-              <label for="start-weight">Starting weight</label>
-              <div class="input-with-unit">
-                <input type="number" id="start-weight" placeholder="85.0" step="0.1" min="30" max="300" />
-                <span class="unit-badge">kg</span>
-              </div>
-            </div>
-            <div class="field-group">
-              <label for="start-height">Height</label>
-              <div class="input-with-unit">
-                <input type="number" id="start-height" placeholder="170" step="1" min="100" max="250" />
-                <span class="unit-badge">cm</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="field-group">
-            <label for="goal-weight">Goal weight</label>
-            <div class="input-with-unit">
-              <input type="number" id="goal-weight" placeholder="70.0" step="0.1" min="30" max="300" />
-              <span class="unit-badge">kg</span>
-            </div>
-          </div>
-
-          <button class="btn-primary" id="start-btn">
-            <span>Start tracking</span>
-            <svg viewBox="0 0 20 20" fill="none"><path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-
-          <p class="form-note" id="form-error"></p>
+      <div class="field-group">
+        <label for="ob-goal">Goal weight</label>
+        <div class="input-unit">
+          <input id="ob-goal" type="number" step="0.1" placeholder="75.0"/>
+          <span class="unit">kg</span>
         </div>
       </div>
+
+      <button id="btn-start" class="btn-primary">Start my journey →</button>
+      <p class="auth-note" id="auth-error"></p>
     </div>
   </div>
 
-  <!-- ═══════════════════════════════════════════════════
-       DASHBOARD SCREEN
-  ═══════════════════════════════════════════════════ -->
-  <div id="dashboard-screen" class="screen">
-    <!-- Top Nav -->
-    <nav class="topnav">
-      <div class="nav-logo">
-        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="var(--accent)" stroke-width="2" fill="none" opacity="0.3"/><path d="M7 15 C7 15 9 9 12 9 C15 9 17 15 17 15" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="12" cy="7" r="1.5" fill="var(--accent)"/></svg>
-        <span>LeanLog</span>
+  <!-- ── DASHBOARD ── -->
+  <div id="dashboard" class="screen">
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <span class="logo-leaf">🌿</span>
+        <span class="brand-name">LeanLog</span>
       </div>
-      <button class="btn-icon" id="logout-btn" title="Sign out">
-        <svg viewBox="0 0 20 20" fill="none"><path d="M13 7l3 3-3 3M16 10H8M10 4H5a1 1 0 00-1 1v10a1 1 0 001 1h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-    </nav>
 
-    <main class="dashboard-main">
-      <!-- ── Profile Card ── -->
-      <section class="profile-card">
-        <div class="profile-info">
-          <div class="avatar" id="avatar-circle">S</div>
-          <div class="profile-text">
-            <h2 id="profile-name">Loading…</h2>
-            <span class="profile-meta" id="profile-meta">—</span>
-          </div>
-        </div>
-        <div class="badge-wrapper">
-          <div class="progress-badge" id="progress-badge">
-            <span class="badge-delta" id="badge-delta">— kg</span>
-            <span class="badge-label">net change</span>
-          </div>
-        </div>
-      </section>
+      <nav class="sidebar-nav">
+        <a href="#" class="nav-item active" data-tab="today">
+          <svg viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+          Today
+        </a>
+        <a href="#" class="nav-item" data-tab="history">
+          <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          History
+        </a>
+        <a href="#" class="nav-item" data-tab="profile">
+          <svg viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+          Profile
+        </a>
+      </nav>
 
-      <!-- ── Stats Row ── -->
-      <section class="stats-row">
-        <div class="stat-card">
-          <span class="stat-label">Start weight</span>
-          <span class="stat-value" id="stat-start">—</span>
-        </div>
-        <div class="stat-card accent-card">
-          <span class="stat-label">Current weight</span>
-          <span class="stat-value" id="stat-current">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Goal weight</span>
-          <span class="stat-value" id="stat-goal">—</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Days tracked</span>
-          <span class="stat-value" id="stat-days">—</span>
-        </div>
-      </section>
+      <button id="btn-logout" class="btn-logout">Sign out</button>
+    </aside>
 
-      <!-- ── Today's Entry ── -->
-      <section class="today-section">
-        <div class="today-header">
+    <!-- Main content -->
+    <main class="main-content">
+
+      <!-- TODAY TAB -->
+      <section id="tab-today" class="tab-panel active">
+        <div class="panel-header">
           <div>
-            <h3 class="section-title">Today's entry</h3>
-            <p class="today-date" id="today-date">—</p>
+            <p class="panel-eyebrow" id="today-date-label">Monday, 23 June</p>
+            <h2 class="panel-title">Today's Log</h2>
           </div>
-          <div class="today-status" id="today-status">
-            <span class="status-dot active"></span>
-            <span>Live</span>
+          <div class="day-badge" id="day-badge">Day 1</div>
+        </div>
+
+        <div class="today-cards">
+          <!-- Weight Card -->
+          <div class="log-card">
+            <div class="card-icon">⚖️</div>
+            <label class="card-label">Weight today</label>
+            <div class="card-input-row">
+              <input id="today-weight" type="number" step="0.1" class="card-input" placeholder="—"/>
+              <span class="card-unit">kg</span>
+            </div>
+            <p class="card-hint" id="weight-hint"></p>
+          </div>
+
+          <!-- Calories Card -->
+          <div class="log-card">
+            <div class="card-icon">🔥</div>
+            <label class="card-label">Calories consumed</label>
+            <div class="card-input-row">
+              <input id="today-calories" type="number" class="card-input" placeholder="—"/>
+              <span class="card-unit">kcal</span>
+            </div>
+            <p class="card-hint" id="calorie-hint"></p>
+          </div>
+
+          <!-- Notes Card -->
+          <div class="log-card log-card--wide">
+            <div class="card-icon">📝</div>
+            <label class="card-label">Notes (optional)</label>
+            <textarea id="today-notes" class="card-textarea" placeholder="How did today feel?"></textarea>
           </div>
         </div>
 
-        <div class="today-form" id="today-form">
-          <div class="today-inputs">
-            <div class="field-group">
-              <label for="today-weight">Today's weight</label>
-              <div class="input-with-unit">
-                <input type="number" id="today-weight" placeholder="84.5" step="0.1" min="30" max="300" />
-                <span class="unit-badge">kg</span>
-              </div>
-            </div>
-            <div class="field-group">
-              <label for="today-calories">Calories consumed</label>
-              <div class="input-with-unit">
-                <input type="number" id="today-calories" placeholder="1800" step="50" min="0" max="10000" />
-                <span class="unit-badge">kcal</span>
-              </div>
-            </div>
+        <div class="save-row">
+          <button id="btn-save-today" class="btn-primary">Save today's log</button>
+          <p class="save-status" id="save-status"></p>
+        </div>
+
+        <!-- Mini summary -->
+        <div class="mini-summary" id="mini-summary" style="display:none">
+          <div class="summary-item">
+            <span class="summary-label">Starting weight</span>
+            <span class="summary-val" id="summary-start">—</span>
           </div>
-          <div class="today-actions">
-            <button class="btn-primary" id="save-today-btn">
-              <svg viewBox="0 0 20 20" fill="none"><path d="M5 10l4 4 6-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Save today
-            </button>
-            <p class="save-hint">You can edit until midnight</p>
+          <div class="summary-divider"></div>
+          <div class="summary-item">
+            <span class="summary-label">Current weight</span>
+            <span class="summary-val" id="summary-current">—</span>
           </div>
-          <div class="save-toast" id="save-toast">
-            <svg viewBox="0 0 20 20" fill="none"><path d="M5 10l4 4 6-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Saved!
+          <div class="summary-divider"></div>
+          <div class="summary-item">
+            <span class="summary-label">Change</span>
+            <span class="summary-val badge-change" id="summary-change">—</span>
           </div>
         </div>
       </section>
 
-      <!-- ── History Timeline ── -->
-      <section class="history-section">
-        <h3 class="section-title">History</h3>
-        <div class="history-timeline" id="history-timeline">
-          <div class="empty-history">
-            <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="24" cy="24" r="20" stroke="var(--text-muted)" stroke-width="1.5" fill="none" opacity="0.4"/><path d="M16 28 C16 28 18 20 24 20 C30 20 32 28 32 28" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.4"/></svg>
-            <p>No history yet. Your first saved entry will appear here.</p>
+      <!-- HISTORY TAB -->
+      <section id="tab-history" class="tab-panel">
+        <div class="panel-header">
+          <div>
+            <p class="panel-eyebrow">All entries</p>
+            <h2 class="panel-title">History</h2>
+          </div>
+        </div>
+        <div id="history-list" class="history-list">
+          <p class="empty-state">No history yet. Start logging to see your journey.</p>
+        </div>
+      </section>
+
+      <!-- PROFILE TAB -->
+      <section id="tab-profile" class="tab-panel">
+        <div class="panel-header">
+          <div>
+            <p class="panel-eyebrow">Your account</p>
+            <h2 class="panel-title">Profile</h2>
+          </div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="profile-hero">
+            <div class="avatar" id="profile-avatar">A</div>
+            <h3 class="profile-name" id="profile-name">—</h3>
+            <div class="progress-badge" id="progress-badge">
+              <span id="badge-icon">🏅</span>
+              <span id="badge-text">0.0 kg</span>
+            </div>
+          </div>
+
+          <div class="profile-stats">
+            <div class="stat-card">
+              <span class="stat-label">BMI</span>
+              <span class="stat-val" id="stat-bmi">—</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Days tracked</span>
+              <span class="stat-val" id="stat-days">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Goal weight</span>
+              <span class="stat-val" id="stat-goal">— kg</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Remaining</span>
+              <span class="stat-val" id="stat-remaining">— kg</span>
+            </div>
+          </div>
+
+          <div class="profile-edit">
+            <h4 class="edit-title">Update details</h4>
+            <div class="field-group">
+              <label for="edit-goal">Goal weight (kg)</label>
+              <div class="input-unit">
+                <input id="edit-goal" type="number" step="0.1" placeholder="75.0"/>
+                <span class="unit">kg</span>
+              </div>
+            </div>
+            <button id="btn-save-profile" class="btn-secondary">Update goal</button>
           </div>
         </div>
       </section>
+
     </main>
   </div>
 
-  <!-- Firebase SDKs (compat version for simplicity) -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
-  <script src="firebase-config.js"></script>
-  <script src="app.js"></script>
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Firebase & App scripts -->
+  <script type="module" src="firebase-config.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
