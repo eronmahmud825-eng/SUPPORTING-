@@ -1,400 +1,369 @@
-// ════════════════════════════════════════════════════
-//  app.js  —  LeanLog Weight Loss Tracker
-// ════════════════════════════════════════════════════
+// ──────────────────────────────────────────────
+//  app.js  —  LeanLog application logic
+// ──────────────────────────────────────────────
 
-// ── Helpers ──────────────────────────────────────────
+import {
+  db, auth,
+  doc, getDoc, setDoc,
+  collection, getDocs,
+  orderBy, query,
+  signInAnonymously,
+  onAuthStateChanged
+} from "./firebase-config.js";
 
-/** Returns today's date key "YYYY-MM-DD" in local time */
-function todayKey() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-/** Formats a date key "YYYY-MM-DD" → "Mon, Jun 23 2025" */
-function formatDateKey(key) {
-  const [y, m, d] = key.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
-    weekday: "short", year: "numeric", month: "short", day: "numeric"
-  });
-}
-
-/** Returns "YYYY-MM-DD" for a given Date object */
-function keyFromDate(date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-}
-
-/** Milliseconds until next midnight */
-function msUntilMidnight() {
-  const now = new Date();
-  const midnight = new Date(now);
-  midnight.setHours(24, 0, 0, 0);
-  return midnight - now;
-}
-
-/** Simple session storage wrapper */
-const Session = {
-  get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
-  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
-  del: (k) => localStorage.removeItem(k),
+// ── STATE ─────────────────────────────────────
+let state = {
+  uid:        null,
+  profile:    null,   // { name, startWeight, height, goalWeight, createdAt }
+  todayKey:   null,   // "YYYY-MM-DD"
+  dayNumber:  1,
+  history:    [],     // sorted array of day entries
 };
 
-// ── Screen Manager ───────────────────────────────────
+// ── HELPERS ───────────────────────────────────
+const $  = id => document.getElementById(id);
+const q  = sel => document.querySelector(sel);
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function fmtDate(key) {
+  const [y,m,d] = key.split('-');
+  return new Date(y,m-1,d).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+}
 
 function showScreen(id) {
-  document.querySelectorAll(".screen").forEach(s => s.classList.remove("active", "fade-in"));
-  const target = document.getElementById(id);
-  target.classList.add("active");
-  requestAnimationFrame(() => target.classList.add("fade-in"));
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
 }
 
-// ── State ────────────────────────────────────────────
-
-let currentUser = null;   // { id, name, startWeight, height, goalWeight }
-let historyEntries = [];  // array of entry objects, sorted newest-first
-let midnightTimer = null;
-
-// ── Firestore Helpers ────────────────────────────────
-
-function userDoc(userId) {
-  return db.collection("users").doc(userId);
+function showTab(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  $(`tab-${tab}`).classList.add('active');
+  q(`.nav-item[data-tab="${tab}"]`).classList.add('active');
+  if (tab === 'history') renderHistory();
+  if (tab === 'profile') renderProfile();
 }
 
-function entryDoc(userId, dateKey) {
-  return db.collection("users").doc(userId).collection("entries").doc(dateKey);
+function toast(msg, type = 'success') {
+  const t = $('toast');
+  t.textContent = msg;
+  t.className = `toast show ${type}`;
+  setTimeout(() => t.className = 'toast', 2800);
 }
 
-function entriesCollection(userId) {
-  return db.collection("users").doc(userId).collection("entries");
+// ── FIREBASE HELPERS ──────────────────────────
+async function loadProfile(uid) {
+  const snap = await getDoc(doc(db, 'users', uid));
+  return snap.exists() ? snap.data() : null;
 }
 
-// ── User ID (anonymous, stored in localStorage) ──────
-// Since there's no email auth, we use a stable random ID stored locally.
-// Replace this with Firebase Auth if you add email/Google sign-in later.
-
-function getOrCreateUserId() {
-  let uid = Session.get("leanlog_uid");
-  if (!uid) {
-    uid = "user_" + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
-    Session.set("leanlog_uid", uid);
-  }
-  return uid;
+async function saveProfile(uid, data) {
+  await setDoc(doc(db, 'users', uid), data, { merge: true });
 }
 
-// ── Splash ───────────────────────────────────────────
-
-function runSplash() {
-  setTimeout(() => {
-    document.getElementById("splash-screen").classList.add("slide-out");
-    setTimeout(() => {
-      document.getElementById("splash-screen").classList.remove("active");
-      initApp();
-    }, 600);
-  }, 2800);
+async function loadDayEntry(uid, key) {
+  const snap = await getDoc(doc(db, 'users', uid, 'days', key));
+  return snap.exists() ? snap.data() : null;
 }
 
-// ── Init ─────────────────────────────────────────────
+async function saveDayEntry(uid, key, data) {
+  await setDoc(doc(db, 'users', uid, 'days', key), data);
+}
 
-async function initApp() {
-  const uid = getOrCreateUserId();
-  try {
-    const snap = await userDoc(uid).get();
-    if (snap.exists) {
-      currentUser = { id: uid, ...snap.data() };
-      await loadDashboard();
-    } else {
-      showScreen("onboarding-screen");
+async function loadHistory(uid) {
+  const q2 = query(collection(db, 'users', uid, 'days'), orderBy('__name__'));
+  const snaps = await getDocs(q2);
+  const entries = [];
+  snaps.forEach(s => entries.push({ key: s.id, ...s.data() }));
+  return entries;
+}
+
+// ── SPLASH → AUTH FLOW ────────────────────────
+setTimeout(() => {
+  onAuthStateChanged(auth, async user => {
+    if (!user) {
+      // Sign in anonymously — persists across page reloads via IndexedDB
+      await signInAnonymously(auth);
+      return;
     }
-  } catch (err) {
-    console.error("Firebase read error:", err);
-    showScreen("onboarding-screen");
-  }
-}
 
-// ── Onboarding ───────────────────────────────────────
+    state.uid = user.uid;
+    state.profile = await loadProfile(user.uid);
+    state.history = await loadHistory(user.uid);
 
-document.getElementById("start-btn").addEventListener("click", async () => {
-  const name = document.getElementById("user-name").value.trim();
-  const startWeight = parseFloat(document.getElementById("start-weight").value);
-  const height = parseFloat(document.getElementById("start-height").value);
-  const goalWeight = parseFloat(document.getElementById("goal-weight").value);
-  const errEl = document.getElementById("form-error");
+    if (!state.profile) {
+      showScreen('onboarding');
+    } else {
+      await initDashboard();
+    }
+  });
+}, 3200); // wait for splash animation
 
-  if (!name) { errEl.textContent = "Please enter your name."; return; }
-  if (isNaN(startWeight) || startWeight < 30) { errEl.textContent = "Enter a valid starting weight."; return; }
-  if (isNaN(height) || height < 100) { errEl.textContent = "Enter a valid height."; return; }
-  if (isNaN(goalWeight) || goalWeight < 30) { errEl.textContent = "Enter a valid goal weight."; return; }
+// ── ONBOARDING ────────────────────────────────
+$('btn-start').addEventListener('click', async () => {
+  const name   = $('ob-name').value.trim();
+  const weight = parseFloat($('ob-weight').value);
+  const height = parseInt($('ob-height').value);
+  const goal   = parseFloat($('ob-goal').value);
 
-  errEl.textContent = "";
-  const btn = document.getElementById("start-btn");
-  btn.disabled = true;
-  btn.querySelector("span").textContent = "Saving…";
-
-  const uid = getOrCreateUserId();
-  const userData = { name, startWeight, height, goalWeight, createdAt: firebase.firestore.FieldValue.serverTimestamp() };
-
-  try {
-    await userDoc(uid).set(userData);
-    currentUser = { id: uid, ...userData };
-    await loadDashboard();
-  } catch (err) {
-    console.error("Error saving user:", err);
-    errEl.textContent = "Couldn't save. Check your connection and try again.";
-    btn.disabled = false;
-    btn.querySelector("span").textContent = "Start tracking";
-  }
-});
-
-// ── Dashboard ────────────────────────────────────────
-
-async function loadDashboard() {
-  showScreen("dashboard-screen");
-  renderProfile();
-  await loadHistory();
-  renderTodayForm();
-  scheduleMidnightReset();
-}
-
-function renderProfile() {
-  const u = currentUser;
-  document.getElementById("profile-name").textContent = u.name;
-  document.getElementById("avatar-circle").textContent = u.name.charAt(0).toUpperCase();
-
-  const heightM = u.height / 100;
-  const bmi = u.startWeight / (heightM * heightM);
-  document.getElementById("profile-meta").textContent = `${u.height} cm · BMI ${bmi.toFixed(1)} at start`;
-
-  document.getElementById("stat-start").textContent = `${u.startWeight} kg`;
-  document.getElementById("stat-goal").textContent = `${u.goalWeight} kg`;
-}
-
-async function loadHistory() {
-  try {
-    const snap = await entriesCollection(currentUser.id)
-      .orderBy("date", "desc")
-      .get();
-
-    historyEntries = snap.docs.map(d => d.data());
-    renderHistoryStats();
-    renderHistoryTimeline();
-  } catch (err) {
-    console.error("Error loading history:", err);
-  }
-}
-
-function renderHistoryStats() {
-  const u = currentUser;
-  document.getElementById("stat-days").textContent = historyEntries.length;
-
-  // Latest weight from history (most recent entry with weight)
-  const latestEntry = historyEntries.find(e => e.weight);
-  const currentWeight = latestEntry ? latestEntry.weight : u.startWeight;
-  document.getElementById("stat-current").textContent = `${currentWeight} kg`;
-
-  // Net change badge
-  const delta = currentWeight - u.startWeight;
-  const badgeEl = document.getElementById("progress-badge");
-  const deltaEl = document.getElementById("badge-delta");
-  const sign = delta > 0 ? "+" : "";
-  deltaEl.textContent = `${sign}${delta.toFixed(1)} kg`;
-
-  if (delta < 0) {
-    badgeEl.classList.remove("badge-gain", "badge-neutral");
-    badgeEl.classList.add("badge-loss");
-  } else if (delta > 0) {
-    badgeEl.classList.remove("badge-loss", "badge-neutral");
-    badgeEl.classList.add("badge-gain");
-  } else {
-    badgeEl.classList.remove("badge-loss", "badge-gain");
-    badgeEl.classList.add("badge-neutral");
-  }
-}
-
-function renderHistoryTimeline() {
-  const container = document.getElementById("history-timeline");
-
-  // Past entries only (not today)
-  const today = todayKey();
-  const past = historyEntries.filter(e => e.date !== today);
-
-  if (past.length === 0) {
-    container.innerHTML = `
-      <div class="empty-history">
-        <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="var(--text-muted)" stroke-width="1.5" fill="none" opacity="0.4"/><path d="M16 28 C16 28 18 20 24 20 C30 20 32 28 32 28" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round" fill="none" opacity="0.4"/></svg>
-        <p>No history yet. Your first saved entry will appear here after midnight.</p>
-      </div>`;
+  if (!name || isNaN(weight) || isNaN(height) || isNaN(goal)) {
+    $('auth-error').textContent = 'Please fill in all fields.';
     return;
   }
 
-  // Sort ascending for day numbering, but display newest-first
-  const ascending = [...past].sort((a, b) => a.date.localeCompare(b.date));
-  const dayMap = {};
-  ascending.forEach((e, i) => { dayMap[e.date] = i + 1; });
-
-  let prevWeight = currentUser.startWeight;
-  const html = past.map((entry, idx) => {
-    const dayNum = dayMap[entry.date];
-    const ascIdx = ascending.findIndex(e => e.date === entry.date);
-    if (ascIdx > 0) prevWeight = ascending[ascIdx - 1].weight ?? currentUser.startWeight;
-    else prevWeight = currentUser.startWeight;
-
-    const delta = entry.weight != null ? entry.weight - prevWeight : null;
-    const deltaStr = delta != null
-      ? `<span class="entry-delta ${delta < 0 ? "delta-down" : delta > 0 ? "delta-up" : "delta-flat"}">${delta > 0 ? "+" : ""}${delta.toFixed(1)} kg</span>`
-      : "";
-
-    const isFirst = idx === past.length - 1;
-
-    return `
-      <div class="timeline-row">
-        <div class="tl-left">
-          <div class="tl-dot ${isFirst ? "tl-dot-first" : ""}"></div>
-          ${isFirst ? "" : '<div class="tl-line"></div>'}
-        </div>
-        <div class="tl-card">
-          <div class="tl-card-header">
-            <span class="tl-day">Day ${dayNum}</span>
-            <span class="tl-date">${formatDateKey(entry.date)}</span>
-          </div>
-          <div class="tl-card-body">
-            <div class="tl-metric">
-              <span class="tl-metric-label">Weight</span>
-              <span class="tl-metric-value">${entry.weight != null ? entry.weight + " kg" : "—"} ${deltaStr}</span>
-            </div>
-            <div class="tl-metric">
-              <span class="tl-metric-label">Calories</span>
-              <span class="tl-metric-value">${entry.calories != null ? entry.calories.toLocaleString() + " kcal" : "—"}</span>
-            </div>
-          </div>
-        </div>
-      </div>`;
-  }).join("");
-
-  container.innerHTML = html;
-}
-
-// ── Today's Form ─────────────────────────────────────
-
-function renderTodayForm() {
-  const today = todayKey();
-  document.getElementById("today-date").textContent = formatDateKey(today);
-
-  // Pre-fill if today already has an entry
-  const todayEntry = historyEntries.find(e => e.date === today);
-  if (todayEntry) {
-    if (todayEntry.weight != null) document.getElementById("today-weight").value = todayEntry.weight;
-    if (todayEntry.calories != null) document.getElementById("today-calories").value = todayEntry.calories;
-  }
-}
-
-document.getElementById("save-today-btn").addEventListener("click", async () => {
-  const weight = parseFloat(document.getElementById("today-weight").value);
-  const calories = parseFloat(document.getElementById("today-calories").value);
-
-  if (isNaN(weight) && isNaN(calories)) {
-    showToast("Enter at least weight or calories.");
-    return;
-  }
-
-  const today = todayKey();
-  const btn = document.getElementById("save-today-btn");
-  btn.disabled = true;
-
-  // Determine day number
-  const allDates = historyEntries.map(e => e.date).sort();
-  let dayNumber = 1;
-  if (allDates.length > 0) {
-    const existing = historyEntries.find(e => e.date === today);
-    if (existing) {
-      dayNumber = existing.dayNumber;
-    } else {
-      // New day: check if today is already the latest or add
-      const allAscending = [...allDates].sort();
-      const todayInHistory = allAscending.includes(today);
-      if (!todayInHistory) {
-        dayNumber = allAscending.length + 1;
-      }
-    }
-  }
-
-  const entryData = {
-    date: today,
-    weight: isNaN(weight) ? null : weight,
-    calories: isNaN(calories) ? null : calories,
-    dayNumber,
-    savedAt: firebase.firestore.FieldValue.serverTimestamp()
+  $('auth-error').textContent = '';
+  const profile = {
+    name,
+    startWeight: weight,
+    height,
+    goalWeight:  goal,
+    createdAt:   todayKey(),
   };
 
   try {
-    await entryDoc(currentUser.id, today).set(entryData, { merge: true });
-    // Update local history
-    const existingIdx = historyEntries.findIndex(e => e.date === today);
-    if (existingIdx >= 0) {
-      historyEntries[existingIdx] = { ...historyEntries[existingIdx], ...entryData };
-    } else {
-      historyEntries.unshift(entryData);
-    }
-    renderHistoryStats();
-    renderHistoryTimeline();
-    showToast("Saved!");
-  } catch (err) {
-    console.error("Error saving entry:", err);
-    showToast("Error saving. Try again.");
-  } finally {
-    btn.disabled = false;
+    await saveProfile(state.uid, profile);
+    state.profile = profile;
+
+    // Create the first day entry with starting weight
+    const key = todayKey();
+    const firstEntry = { weight, calories: 0, notes: '', savedAt: Date.now() };
+    await saveDayEntry(state.uid, key, firstEntry);
+    state.history = [{ key, ...firstEntry }];
+
+    await initDashboard();
+  } catch(e) {
+    $('auth-error').textContent = 'Error saving — check your Firebase setup.';
+    console.error(e);
   }
 });
 
-function showToast(msg) {
-  const toast = document.getElementById("save-toast");
-  toast.querySelector("svg ~ *") || (toast.innerHTML += "");
-  // Simpler: just update text node after the SVG
-  const textNode = Array.from(toast.childNodes).find(n => n.nodeType === 3);
-  if (textNode) textNode.textContent = " " + msg;
-  else toast.appendChild(document.createTextNode(" " + msg));
-
-  toast.classList.add("show");
-  setTimeout(() => toast.classList.remove("show"), 2200);
+// ── DASHBOARD INIT ────────────────────────────
+async function initDashboard() {
+  showScreen('dashboard');
+  setupNav();
+  setupMidnightCheck();
+  await loadToday();
+  renderMiniSummary();
 }
 
-// ── Midnight Reset ────────────────────────────────────
-
-function scheduleMidnightReset() {
-  if (midnightTimer) clearTimeout(midnightTimer);
-  const ms = msUntilMidnight();
-  midnightTimer = setTimeout(async () => {
-    // Re-render today form (new day started)
-    await loadHistory();
-    renderTodayForm();
-    updateTodayStatus(false);
-    scheduleMidnightReset(); // schedule next midnight
-  }, ms);
-}
-
-function updateTodayStatus(isLive) {
-  const statusEl = document.getElementById("today-status");
-  if (isLive) {
-    statusEl.innerHTML = `<span class="status-dot active"></span><span>Live</span>`;
-  } else {
-    statusEl.innerHTML = `<span class="status-dot locked"></span><span>New day</span>`;
-  }
-}
-
-// ── Logout ───────────────────────────────────────────
-
-document.getElementById("logout-btn").addEventListener("click", () => {
-  if (!confirm("Sign out and clear local session?")) return;
-  Session.del("leanlog_uid");
-  currentUser = null;
-  historyEntries = [];
-  if (midnightTimer) clearTimeout(midnightTimer);
-  // Reset onboarding form
-  ["user-name", "start-weight", "start-height", "goal-weight"].forEach(id => {
-    document.getElementById(id).value = "";
+function setupNav() {
+  document.querySelectorAll('.nav-item').forEach(item => {
+    item.addEventListener('click', e => {
+      e.preventDefault();
+      showTab(item.dataset.tab);
+    });
   });
-  document.getElementById("form-error").textContent = "";
-  showScreen("onboarding-screen");
+
+  $('btn-logout').addEventListener('click', () => {
+    if (confirm('Sign out? Your data is saved in Firebase.')) {
+      auth.signOut().then(() => {
+        state = { uid: null, profile: null, todayKey: null, dayNumber: 1, history: [] };
+        showScreen('onboarding');
+      });
+    }
+  });
+}
+
+// ── TODAY ─────────────────────────────────────
+async function loadToday() {
+  const key = todayKey();
+  state.todayKey = key;
+
+  // Compute day number
+  state.history = await loadHistory(state.uid);
+  const keys = state.history.map(h => h.key).sort();
+  const idx   = keys.indexOf(key);
+  state.dayNumber = idx === -1 ? keys.length + 1 : idx + 1;
+
+  $('today-date-label').textContent = fmtDate(key);
+  $('day-badge').textContent = `Day ${state.dayNumber}`;
+
+  const entry = await loadDayEntry(state.uid, key);
+  if (entry) {
+    $('today-weight').value   = entry.weight   || '';
+    $('today-calories').value = entry.calories || '';
+    $('today-notes').value    = entry.notes    || '';
+    setHints(entry);
+  }
+
+  $('btn-save-today').addEventListener('click', saveToday);
+}
+
+function setHints(entry) {
+  const prev = getPrevEntry();
+  if (prev && entry.weight) {
+    const delta = (entry.weight - prev.weight).toFixed(1);
+    const sign  = delta > 0 ? '+' : '';
+    $('weight-hint').textContent = `${sign}${delta} kg vs yesterday`;
+    $('weight-hint').style.color = delta > 0 ? 'var(--red)' : 'var(--sage)';
+  }
+}
+
+function getPrevEntry() {
+  const sorted = [...state.history].sort((a,b) => a.key.localeCompare(b.key));
+  const today  = state.todayKey;
+  const past   = sorted.filter(h => h.key < today);
+  return past.length ? past[past.length - 1] : null;
+}
+
+async function saveToday() {
+  const weight   = parseFloat($('today-weight').value);
+  const calories = parseInt($('today-calories').value) || 0;
+  const notes    = $('today-notes').value.trim();
+
+  if (isNaN(weight)) {
+    toast('Enter a valid weight first.', 'error'); return;
+  }
+
+  try {
+    const entry = { weight, calories, notes, savedAt: Date.now() };
+    await saveDayEntry(state.uid, state.todayKey, entry);
+
+    // Refresh history
+    state.history = await loadHistory(state.uid);
+
+    setHints(entry);
+    renderMiniSummary();
+
+    $('save-status').textContent = '✓ Saved';
+    setTimeout(() => $('save-status').textContent = '', 2500);
+    toast('Log saved!');
+  } catch(e) {
+    toast('Save failed — check console.', 'error');
+    console.error(e);
+  }
+}
+
+// ── MINI SUMMARY ─────────────────────────────
+function renderMiniSummary() {
+  if (!state.profile || !state.history.length) return;
+
+  const sorted  = [...state.history].sort((a,b) => a.key.localeCompare(b.key));
+  const start   = state.profile.startWeight;
+  const latest  = sorted[sorted.length - 1];
+  const current = latest ? latest.weight : start;
+  const delta   = (current - start).toFixed(1);
+  const sign    = delta > 0 ? '+' : '';
+  const isGain  = delta > 0;
+
+  $('summary-start').textContent   = `${start} kg`;
+  $('summary-current').textContent = `${current} kg`;
+  $('summary-change').textContent  = `${sign}${delta} kg`;
+  $('summary-change').className    = `summary-val badge-change${isGain ? ' gain' : ''}`;
+
+  $('mini-summary').style.display = 'flex';
+}
+
+// ── MIDNIGHT CHECK ────────────────────────────
+function setupMidnightCheck() {
+  setInterval(() => {
+    const key = todayKey();
+    if (key !== state.todayKey) {
+      state.todayKey = key;
+      // Clear inputs for fresh day
+      $('today-weight').value   = '';
+      $('today-calories').value = '';
+      $('today-notes').value    = '';
+      $('weight-hint').textContent   = '';
+      $('calorie-hint').textContent  = '';
+      loadToday();
+      toast('New day! Yesterday\'s log is locked. 🌱');
+    }
+  }, 30000); // check every 30s
+}
+
+// ── HISTORY ───────────────────────────────────
+function renderHistory() {
+  const list   = $('history-list');
+  const sorted = [...state.history].sort((a,b) => b.key.localeCompare(a.key));
+
+  if (!sorted.length) {
+    list.innerHTML = '<p class="empty-state">No history yet. Start logging to see your journey.</p>';
+    return;
+  }
+
+  const allSorted = [...state.history].sort((a,b) => a.key.localeCompare(b.key));
+
+  list.innerHTML = sorted.map((entry, revIdx) => {
+    const dayNum = allSorted.findIndex(e => e.key === entry.key) + 1;
+    const prevIdx = allSorted.findIndex(e => e.key === entry.key) - 1;
+    const prev    = prevIdx >= 0 ? allSorted[prevIdx] : null;
+
+    let deltaHtml = '';
+    if (prev && entry.weight && prev.weight) {
+      const d    = (entry.weight - prev.weight).toFixed(1);
+      const sign = d > 0 ? '+' : '';
+      const cls  = d > 0 ? 'entry-delta gain' : 'entry-delta';
+      deltaHtml  = `<span class="${cls}">${sign}${d} kg</span>`;
+    }
+
+    return `
+      <div class="history-entry">
+        <div class="entry-day">${dayNum}</div>
+        <div>
+          <div class="entry-date">${fmtDate(entry.key)}</div>
+          <div class="entry-weight">${entry.weight ? entry.weight + ' kg' : '—'}</div>
+          ${entry.notes ? `<div class="entry-notes">${entry.notes}</div>` : ''}
+        </div>
+        ${deltaHtml}
+        <div class="entry-cal">
+          <div class="entry-cal-val">${entry.calories ? entry.calories.toLocaleString() : '—'}</div>
+          <div class="entry-cal-label">kcal</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── PROFILE ───────────────────────────────────
+function renderProfile() {
+  if (!state.profile) return;
+
+  const { name, startWeight, height, goalWeight } = state.profile;
+  const sorted  = [...state.history].sort((a,b) => a.key.localeCompare(b.key));
+  const latest  = sorted[sorted.length - 1];
+  const current = (latest && latest.weight) ? latest.weight : startWeight;
+  const delta   = +(current - startWeight).toFixed(1);
+  const sign    = delta > 0 ? '+' : '';
+  const bmi     = height ? (current / Math.pow(height / 100, 2)).toFixed(1) : '—';
+  const remaining = goalWeight ? +(current - goalWeight).toFixed(1) : null;
+
+  // Avatar
+  $('profile-avatar').textContent = name ? name[0].toUpperCase() : '?';
+  $('profile-name').textContent   = name;
+
+  // Badge
+  const isGain = delta > 0;
+  $('badge-icon').textContent = isGain ? '📈' : '📉';
+  $('badge-text').textContent = `${sign}${delta} kg`;
+  $('progress-badge').style.color = isGain ? '#ffaa7f' : '#7fffaa';
+
+  // Stats
+  $('stat-bmi').textContent  = bmi;
+  $('stat-days').textContent = state.history.length;
+  $('stat-goal').textContent = goalWeight ? `${goalWeight} kg` : '—';
+  $('stat-remaining').textContent = remaining !== null
+    ? (remaining > 0 ? `${remaining} kg to go` : `${Math.abs(remaining)} kg past goal! 🎉`)
+    : '—';
+
+  // Pre-fill edit field
+  $('edit-goal').value = goalWeight || '';
+}
+
+$('btn-save-profile').addEventListener('click', async () => {
+  const goal = parseFloat($('edit-goal').value);
+  if (isNaN(goal)) { toast('Enter a valid goal weight.', 'error'); return; }
+
+  try {
+    await saveProfile(state.uid, { goalWeight: goal });
+    state.profile.goalWeight = goal;
+    renderProfile();
+    toast('Goal updated!');
+  } catch(e) {
+    toast('Update failed.', 'error');
+    console.error(e);
+  }
 });
-
-// ── Boot ─────────────────────────────────────────────
-
-runSplash();
